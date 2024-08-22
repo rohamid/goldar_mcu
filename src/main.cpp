@@ -28,7 +28,26 @@ StepperMotor motor(STEPPER_PIN_1, STEPPER_PIN_2, STEPPER_PIN_3, STEPPER_PIN_4);
 int servoStirPin = 6;     // Pin Arduino yang terhubung ke pin sinyal servo pertama
 int servoMountingPin = 7; // Pin Arduino yang terhubung ke pin sinyal servo kedua
 
+// declare ldr
+int ldrA1_pin = A0;
+int ldrA2_pin = A1;
+int ldrA3_pin = A2;
+int ldrA4_pin = A3;
+int ldrA5_pin = A4;
+int ldrB1_pin = A5;
+int ldrB2_pin = A6;
+int ldrB3_pin = A7;
+int ldrB4_pin = A8;
+int ldrB5_pin = A9;
+int ldrC1_pin = A10;
+int ldrC2_pin = A11;
+int ldrC3_pin = A12;
+int ldrC4_pin = A13;
+int ldrC5_pin = A14;
+
 // global variable Utama
+String GolonganDarah = "";
+int kodeGolonganDarah = 0;
 bool startStatus = false, processStatus = false;
 unsigned int currentTimer = 0, timer = 0, timerinterval = 1000;
 unsigned int currentTimerProcess = 0, timerProcess = 0, processTime = 5000; // TODO: atur sesuai kebutuhan
@@ -50,6 +69,11 @@ Servo servoMounting; // Membuat objek untuk servo kedua
 unsigned int currentTimerServo = 0, timerServo = 0, timerIntervalServo = 20;
 bool stirring = false, stirringCW = true;
 int servoStirPos = 0;
+
+// global variable ldr
+int ldrA1, ldrA2, ldrA3, ldrA4, ldrA5;
+int ldrB1, ldrB2, ldrB3, ldrB4, ldrB5;
+int ldrC1, ldrC2, ldrC3, ldrC4, ldrC5;
 
 // fungsi dari komponen
 //-----------------------------------------------------------------------------------------------
@@ -148,24 +172,144 @@ void initServo()
   servoStir.write(0);
   servoMounting.write(180); // servo untuk mount
 }
+
+void readldr()
+{
+  ldrA1 = analogRead(ldrA1_pin);
+  ldrA2 = analogRead(ldrA2_pin);
+  ldrA3 = analogRead(ldrA3_pin);
+  ldrA4 = analogRead(ldrA4_pin);
+  ldrA5 = analogRead(ldrA5_pin);
+  ldrB1 = analogRead(ldrB1_pin);
+  ldrB2 = analogRead(ldrB2_pin);
+  ldrB3 = analogRead(ldrB3_pin);
+  ldrB4 = analogRead(ldrB4_pin);
+  ldrB5 = analogRead(ldrB5_pin);
+  ldrC1 = analogRead(ldrC1_pin);
+  ldrC2 = analogRead(ldrC2_pin);
+  ldrC3 = analogRead(ldrC3_pin);
+  ldrC4 = analogRead(ldrC4_pin);
+  ldrC5 = analogRead(ldrC5_pin);
+}
+
+// fungsi pendukung
+//-----------------------------------------------------------------------------------------------
+typedef struct lpf_config_t
+{
+  float value;
+  float valueNew;
+  float valueOld;
+  float factor;
+} lpf_config_t;
+
+lpf_config_t filterLDR;
+void lpf_init(lpf_config_t *lpf, float filter_factor)
+{
+  lpf->value = lpf->valueNew = lpf->valueOld = 0.0;
+  lpf->factor = filter_factor;
+}
+float lpf_get_filter(lpf_config_t *lpf, float input)
+{
+  lpf->value = input;
+  lpf->valueNew = ((1.0 - lpf->factor) * lpf->valueOld) + (lpf->factor * lpf->value);
+  lpf->valueOld = lpf->valueNew;
+
+  return (lpf->valueNew);
+}
+
+void getGoldar()
+{
+  int nilaiSensor1 = 0, nilaiSensor2 = 0, nilaiSensor3 = 0;
+
+  nilaiSensor1 += ldrA1;
+  nilaiSensor1 += ldrA2;
+  nilaiSensor1 += ldrA3;
+  nilaiSensor1 += ldrA4;
+  nilaiSensor1 += ldrA5;
+
+  nilaiSensor2 += ldrB1;
+  nilaiSensor2 += ldrB2;
+  nilaiSensor2 += ldrB3;
+  nilaiSensor2 += ldrB4;
+  nilaiSensor2 += ldrB5;
+
+  nilaiSensor3 += ldrC1;
+  nilaiSensor3 += ldrC2;
+  nilaiSensor3 += ldrC3;
+  nilaiSensor3 += ldrC4;
+  nilaiSensor3 += ldrC5;
+
+  // Hitung rerata dari pembacaan 5 LDR
+  nilaiSensor1 = nilaiSensor1 / 5;
+  int nilaiTerfilterSensor1 = (int)lpf_get_filter(&filterLDR, nilaiSensor1);
+  Serial.print("Sensor1:");
+  Serial.print(nilaiSensor1);
+  Serial.print(",");
+  Serial.print("\tFilter:");
+  Serial.print(nilaiTerfilterSensor1);
+
+  nilaiSensor2 = nilaiSensor2 / 5;
+  int nilaiTerfilterSensor2 = (int)lpf_get_filter(&filterLDR, nilaiSensor2);
+  Serial.print("\tSensor2:");
+  Serial.print(nilaiSensor2);
+  Serial.print(",");
+  Serial.print("\tFilter:");
+  Serial.print(nilaiTerfilterSensor2);
+
+  nilaiSensor3 = nilaiSensor3 / 5;
+  int nilaiTerfilterSensor3 = (int)lpf_get_filter(&filterLDR, nilaiSensor3);
+  Serial.print("\tSensor3:");
+  Serial.print(nilaiSensor3);
+  Serial.print(",");
+  Serial.print("\tFilter:");
+  Serial.print(nilaiTerfilterSensor3);
+  Serial.print("\n");
+
+  // TODO: GET GOLONGAN DARAH
+  GolonganDarah = "A+";
+  kodeGolonganDarah = 1;
+
+  Serial.print("Golongan Darah : ");
+  Serial.println(GolonganDarah);
+}
+
 void process()
 {
   timerServo = millis();
   timerProcess = millis();
+
   while (processStatus)
   {
+    readldr();
     currentTimerProcess = millis();
+    currentTimer = millis();
+    currentTimerServo = millis();
+
     if ((currentTimerProcess - timerProcess) > processTime)
     {
       timerProcess = currentTimerProcess;
       processStatus = false;
       stirring = false;
+      getGoldar();
       Serial.println("Process done");
     }
 
-    // reading ldr
+    if ((currentTimer - timer) > timerinterval)
+    {
+      timer = currentTimer;
+      Serial.print("A: ");
+      Serial.print(ldrA1);
+      Serial.print("\t");
+      Serial.print(ldrA2);
+      Serial.print("\t");
+      Serial.print(ldrA3);
+      Serial.print("\t");
+      Serial.print(ldrA4);
+      Serial.print("\t");
+      Serial.print(ldrA5);
+      Serial.println();
+    }
 
-    currentTimerServo = millis();
     if (stirring && (currentTimerServo - timerServo) > timerIntervalServo)
     {
       timerServo = currentTimerServo;
@@ -189,8 +333,7 @@ void process()
     }
   }
 }
-// fungsi pendukung
-//-----------------------------------------------------------------------------------------------
+
 void blinkNotification(int led, int times)
 {
   for (int i = 0; i < times; i++)
@@ -211,6 +354,12 @@ void handleCommand(char command)
     startStatus = true;
     blinkNotification(greenLed, 1);
 
+    break;
+  case '2':                              // Jika bt0.val == 1 (bt0 ditekan)
+    Serial.println("maintenance");       // Debug message
+    Serial.println("opening tray full"); // Debug message
+    motor.stepMotor(12000, true);
+    blinkNotification(greenLed, 1);
     break;
 
   case 'A':                        // Jika bt0.val == 1 (bt0 ditekan)
@@ -312,10 +461,10 @@ void setup()
   initServo();
 
   // run once
-  getReady();
-  motorMove(0);
   vavail();
   handleError();
+  getReady();
+  motorMove(0);
 
   // tell the world device ready
   Serial.println("All System Ready");
