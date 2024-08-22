@@ -5,6 +5,8 @@ start -> [init] -> open -> close -> run
 #include <Arduino.h>
 #include <StepperMotor.h>
 #include <Servo.h>
+#include <SoftwareSerial.h>
+#include "Adafruit_Thermal.h"
 
 // Global variable and declaration
 //-----------------------------------------------------------------------------------------------
@@ -45,6 +47,10 @@ int ldrC3_pin = A12;
 int ldrC4_pin = A13;
 int ldrC5_pin = A14;
 
+// declare printer
+#define TX_PIN 9 // Pin untuk TX ke RX printer
+#define RX_PIN 8 // Pin untuk RX dari TX printer
+
 // global variable Utama
 String GolonganDarah = "";
 int kodeGolonganDarah = 0;
@@ -74,6 +80,10 @@ int servoStirPos = 0;
 int ldrA1, ldrA2, ldrA3, ldrA4, ldrA5;
 int ldrB1, ldrB2, ldrB3, ldrB4, ldrB5;
 int ldrC1, ldrC2, ldrC3, ldrC4, ldrC5;
+
+// global variable printer
+SoftwareSerial mySerial(RX_PIN, TX_PIN); // RX, TX
+Adafruit_Thermal printer(&mySerial);
 
 // fungsi dari komponen
 //-----------------------------------------------------------------------------------------------
@@ -190,6 +200,39 @@ void readldr()
   ldrC3 = analogRead(ldrC3_pin);
   ldrC4 = analogRead(ldrC4_pin);
   ldrC5 = analogRead(ldrC5_pin);
+}
+
+void initPrinter()
+{
+  mySerial.begin(9600); // Sesuaikan baud rate dengan printer Anda
+  printer.begin();      // Memulai printer
+}
+
+void print(String bloodType)
+{
+
+  delay(2000);
+
+  printer.setSize('M');
+  printer.justify('C'); // Menyelaraskan teks ke tengah
+  printer.println("KARTU TEST");
+  printer.println("GOLONGAN DARAH");
+
+  printer.feed(2); // Beri jarak 2 baris kosong setelah teks
+
+  printer.justify('M'); // Kembali ke penyelarasan kiri
+  printer.println("NAMA :");
+  printer.println("UMUR :");
+
+  printer.feed(2); // Beri jarak 2 baris kosong setelah teks
+
+  printer.justify('C'); // Menyelaraskan teks ke tengah
+  printer.setSize('S');
+  printer.println("HASIL");
+  printer.setSize('L');
+  printer.println(bloodType);
+
+  printer.feed(3); // Beri jarak 2 baris kosong setelah teks
 }
 
 // fungsi pendukung
@@ -389,11 +432,19 @@ void handleCommand(char command)
     break;
   case 'D':                        // Jika bt1.val == 0 (bt1 dilepas)
     Serial.println("show button"); // Debug message
-    delay(2000);
+    {
+      // print(GolonganDarah);
+      delay(2000);
+    }
     break;
+
   case 'E':                         // Jika bt1.val == 0 (bt1 dilepas)
     Serial.println("print button"); // Debug message
-    delay(2000);
+    if (kodeGolonganDarah != 0)
+    {
+      print(GolonganDarah);
+      delay(2000);
+    }
     break;
 
   default:
@@ -459,6 +510,7 @@ void setup()
   // init component
   init_blink();
   initServo();
+  initPrinter();
 
   // run once
   vavail();
@@ -468,8 +520,10 @@ void setup()
 
   // tell the world device ready
   Serial.println("All System Ready");
-
-  Serial.println("Serial communication started."); // Debug message
+  printer.setSize('M');
+  printer.justify('C'); // Menyelaraskan teks ke tengah
+  printer.println("ALAT SIAP!");
+  printer.feed(2); // Beri jarak 2 baris kosong setelah teks
 }
 
 void loop()
