@@ -1,6 +1,7 @@
 
 // library utama
 #include <Arduino.h>
+#include <StepperMotor.h>
 
 // Global variable and declaration
 //-----------------------------------------------------------------------------------------------
@@ -12,6 +13,14 @@ int blueLed = 22;
 // declare VoltageAvailable
 int vavailPin = 26;
 
+// declare Stepper
+#define STEPPER_PIN_1 2
+#define STEPPER_PIN_2 3
+#define STEPPER_PIN_3 4
+#define STEPPER_PIN_4 5
+#define STEPPER_LIMIT_PIN 23
+StepperMotor motor(STEPPER_PIN_1, STEPPER_PIN_2, STEPPER_PIN_3, STEPPER_PIN_4);
+
 // global variable Utama
 bool startStatus = false;
 unsigned int currentTimer = 0, timer = 0, timerinterval = 1000;
@@ -22,6 +31,9 @@ int delayblink = 100;
 
 // global variable VoltageAvailable
 bool vavailStatus = false;
+
+// global variable Stepper
+bool closeFull = false, openFull = false;
 
 // fungsi dari komponen
 //-----------------------------------------------------------------------------------------------
@@ -72,36 +84,94 @@ void vavail()
     unsetError(1);
   }
 }
+
+void checkTrayCLose()
+{
+  closeFull = digitalRead(STEPPER_LIMIT_PIN);
+}
+
+void motorMove(int command)
+{
+  switch (command)
+  {
+  case 0:
+
+    if (openFull)
+    {
+      Serial.println("Close Tray Half");
+      motor.stepMotor(720, false); // TODO: HARUSNYA 720
+      openFull = false;
+    }
+    else
+    {
+      Serial.println("Close Tray Full");
+      while (!closeFull)
+      {
+        checkTrayCLose();
+        motor.stepMotor(10, false);
+      }
+    }
+    break;
+
+  case 1:
+    if (closeFull)
+    {
+      Serial.println("Open Tray Full");
+      motor.stepMotor(1200, true); // TODO: HARUSNYA 12000
+      openFull = true;
+    }
+    break;
+
+  default:
+    break;
+  }
+}
 // fungsi pendukung
 //-----------------------------------------------------------------------------------------------
+void blinkNotification(int led, int times)
+{
+  for (int i = 0; i < times; i++)
+  {
+    digitalWrite(led, HIGH);
+    delay(delayblink);
+    digitalWrite(led, LOW);
+    delay(delayblink);
+  }
+}
 
 void handleCommand(char command)
 {
   switch (command)
   {
-  case '1':                  // Jika bt0.val == 1 (bt0 ditekan)
-    Serial.println("Start"); // Debug message
+  case '1':                         // Jika bt0.val == 1 (bt0 ditekan)
+    Serial.println("Start button"); // Debug message
     startStatus = true;
+    blinkNotification(greenLed, 1);
+
+    break;
+
+  case 'A':                        // Jika bt0.val == 1 (bt0 ditekan)
+    Serial.println("open button"); // Debug message
+    motorMove(1);                  // open tray full
+    blinkNotification(greenLed, 2);
+    break;
+
+  case 'B':                         // Jika bt0.val == 0 (bt0 dilepas)
+    Serial.println("close button"); // Debug message
+    motorMove(0);                   // close tray full
+    blinkNotification(greenLed, 2);
+    break;
+
+  case 'C':                       // Jika bt1.val == 1 (bt1 ditekan)
+    Serial.println("run button"); // Debug message
     delay(2000);
     break;
-  case 'A':                      // Jika bt0.val == 1 (bt0 ditekan)
-    Serial.println("open tray"); // Debug message
+  case 'D':                        // Jika bt1.val == 0 (bt1 dilepas)
+    Serial.println("show button"); // Debug message
     delay(2000);
     break;
-  case 'B':                       // Jika bt0.val == 0 (bt0 dilepas)
-    Serial.println("close tray"); // Debug message
-    delay(2000);
-    break;
-  case 'C':                // Jika bt1.val == 1 (bt1 ditekan)
-    Serial.println("run"); // Debug message
-    delay(2000);
-    break;
-  case 'D':                 // Jika bt1.val == 0 (bt1 dilepas)
-    Serial.println("show"); // Debug message
-    delay(2000);
-    break;
-  case 'E':                  // Jika bt1.val == 0 (bt1 dilepas)
-    Serial.println("print"); // Debug message
+  case 'E':                         // Jika bt1.val == 0 (bt1 dilepas)
+    Serial.println("print button"); // Debug message
     delay(2000);
     break;
 
@@ -170,6 +240,7 @@ void setup()
 
   // run once
   getReady();
+  motorMove(0);
   vavail();
   handleError();
 
@@ -192,6 +263,7 @@ void loop()
   // function to read along
   handleError();
   vavail();
+  checkTrayCLose();
   currentTimer = millis();
 
   // fuction to run at interval
