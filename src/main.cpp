@@ -1,7 +1,10 @@
-
+/*
+start -> [init] -> open -> close -> run
+*/
 // library utama
 #include <Arduino.h>
 #include <StepperMotor.h>
+#include <Servo.h>
 
 // Global variable and declaration
 //-----------------------------------------------------------------------------------------------
@@ -21,9 +24,15 @@ int vavailPin = 26;
 #define STEPPER_LIMIT_PIN 23
 StepperMotor motor(STEPPER_PIN_1, STEPPER_PIN_2, STEPPER_PIN_3, STEPPER_PIN_4);
 
+// declare Servo
+int servoStirPin = 6;     // Pin Arduino yang terhubung ke pin sinyal servo pertama
+int servoMountingPin = 7; // Pin Arduino yang terhubung ke pin sinyal servo kedua
+
 // global variable Utama
-bool startStatus = false;
+bool startStatus = false, processStatus = false;
 unsigned int currentTimer = 0, timer = 0, timerinterval = 1000;
+unsigned int currentTimerProcess = 0, timerProcess = 0, processTime = 5000; // TODO: atur sesuai kebutuhan
+
 byte errorByte = 0;
 
 // global variable indicatorLed
@@ -33,7 +42,14 @@ int delayblink = 100;
 bool vavailStatus = false;
 
 // global variable Stepper
-bool closeFull = false, openFull = false;
+bool closeFull = false, hasSample = false;
+
+// global variable Servo
+Servo servoStir;     // Membuat objek untuk servo pertama
+Servo servoMounting; // Membuat objek untuk servo kedua
+unsigned int currentTimerServo = 0, timerServo = 0, timerIntervalServo = 20;
+bool stirring = false, stirringCW = true;
+int servoStirPos = 0;
 
 // fungsi dari komponen
 //-----------------------------------------------------------------------------------------------
@@ -95,21 +111,11 @@ void motorMove(int command)
   switch (command)
   {
   case 0:
-
-    if (openFull)
+    Serial.println("Close Tray Full");
+    while (!closeFull)
     {
-      Serial.println("Close Tray Half");
-      motor.stepMotor(720, false); // TODO: HARUSNYA 720
-      openFull = false;
-    }
-    else
-    {
-      Serial.println("Close Tray Full");
-      while (!closeFull)
-      {
-        checkTrayCLose();
-        motor.stepMotor(10, false);
-      }
+      checkTrayCLose();
+      motor.stepMotor(10, false);
     }
     break;
 
@@ -118,12 +124,69 @@ void motorMove(int command)
     {
       Serial.println("Open Tray Full");
       motor.stepMotor(1200, true); // TODO: HARUSNYA 12000
-      openFull = true;
+      hasSample = !hasSample;
+      hasSample ? Serial.println("sample dimasukkan") : Serial.println("Sample dikeluarkan");
     }
     break;
 
+  case 2:
+    if (closeFull)
+    {
+      Serial.println("Open Tray half");
+      motor.stepMotor(500, true); // TODO: HARUSNYA 5000
+    }
+
   default:
     break;
+  }
+}
+
+void initServo()
+{
+  servoStir.attach(servoStirPin);         // Menghubungkan objek servo pertama dengan pin servo
+  servoMounting.attach(servoMountingPin); // Menghubungkan objek servo kedua dengan pin servo
+  servoStir.write(0);
+  servoMounting.write(180); // servo untuk mount
+}
+void process()
+{
+  timerServo = millis();
+  timerProcess = millis();
+  while (processStatus)
+  {
+    currentTimerProcess = millis();
+    if ((currentTimerProcess - timerProcess) > processTime)
+    {
+      timerProcess = currentTimerProcess;
+      processStatus = false;
+      stirring = false;
+      Serial.println("Process done");
+    }
+
+    // reading ldr
+
+    currentTimerServo = millis();
+    if (stirring && (currentTimerServo - timerServo) > timerIntervalServo)
+    {
+      timerServo = currentTimerServo;
+      if (stirringCW)
+      {
+        servoStirPos += 5;
+        if (servoStirPos >= 180)
+        {
+          stirringCW = false;
+        }
+      }
+      else
+      {
+        servoStirPos -= 5;
+        if (servoStirPos <= 0)
+        {
+          stirringCW = true;
+        }
+      }
+      servoStir.write(servoStirPos);
+    }
   }
 }
 // fungsi pendukung
@@ -164,7 +227,16 @@ void handleCommand(char command)
 
   case 'C':                       // Jika bt1.val == 1 (bt1 ditekan)
     Serial.println("run button"); // Debug message
-    delay(2000);
+    motorMove(2);                 // run tray half
+    servoMounting.write(90);      // servo mount
+    delay(200);
+    processStatus = true;
+    stirring = true;
+    process();
+    servoMounting.write(180); // servo umount
+
+    // baca sample
+    blinkNotification(greenLed, 2);
     break;
   case 'D':                        // Jika bt1.val == 0 (bt1 dilepas)
     Serial.println("show button"); // Debug message
@@ -237,6 +309,7 @@ void setup()
 
   // init component
   init_blink();
+  initServo();
 
   // run once
   getReady();
