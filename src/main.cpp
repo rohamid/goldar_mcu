@@ -7,6 +7,7 @@ start -> [init] -> open -> close -> run
 #include <Servo.h>
 #include <SoftwareSerial.h>
 #include "Adafruit_Thermal.h"
+#include <DFRobotDFPlayerMini.h>
 
 // Global variable and declaration
 //-----------------------------------------------------------------------------------------------
@@ -51,6 +52,9 @@ int ldrC5_pin = A14;
 #define TX_PIN 9 // Pin untuk TX ke RX printer
 #define RX_PIN 8 // Pin untuk RX dari TX printer
 
+// declare sound
+SoftwareSerial mySoftwareSerial(11, 10); // RX, TX
+
 // global variable Utama
 String GolonganDarah = "";
 int kodeGolonganDarah = 0;
@@ -84,6 +88,9 @@ int ldrC1, ldrC2, ldrC3, ldrC4, ldrC5;
 // global variable printer
 SoftwareSerial mySerial(RX_PIN, TX_PIN); // RX, TX
 Adafruit_Thermal printer(&mySerial);
+
+// global variable sound
+DFRobotDFPlayerMini myDFPlayer;
 
 // fungsi dari komponen
 //-----------------------------------------------------------------------------------------------
@@ -235,6 +242,32 @@ void print(String bloodType)
   printer.feed(3); // Beri jarak 2 baris kosong setelah teks
 }
 
+void initSound()
+{
+  mySoftwareSerial.begin(9600);
+
+  if (!myDFPlayer.begin(mySoftwareSerial))
+  {
+    setError(2);
+  }
+  else
+  {
+    unsetError(2);
+  }
+
+  Serial.println(F("DFPlayer Mini online."));
+  myDFPlayer.play(8); // a+
+
+  myDFPlayer.volume(30); // Set volume value. From 0 to 30
+}
+
+void sound(int numberMusic)
+{
+
+  myDFPlayer.play(numberMusic); // a+
+  delay(2000);
+}
+
 // fungsi pendukung
 //-----------------------------------------------------------------------------------------------
 typedef struct lpf_config_t
@@ -245,7 +278,9 @@ typedef struct lpf_config_t
   float factor;
 } lpf_config_t;
 
-lpf_config_t filterLDR;
+lpf_config_t filterLDR1;
+lpf_config_t filterLDR2;
+lpf_config_t filterLDR3;
 void lpf_init(lpf_config_t *lpf, float filter_factor)
 {
   lpf->value = lpf->valueNew = lpf->valueOld = 0.0;
@@ -284,33 +319,71 @@ void getGoldar()
 
   // Hitung rerata dari pembacaan 5 LDR
   nilaiSensor1 = nilaiSensor1 / 5;
-  int nilaiTerfilterSensor1 = (int)lpf_get_filter(&filterLDR, nilaiSensor1);
+  int nilaiTerfilterLDR1 = (int)lpf_get_filter(&filterLDR1, nilaiSensor1);
   Serial.print("Sensor1:");
   Serial.print(nilaiSensor1);
   Serial.print(",");
   Serial.print("\tFilter:");
-  Serial.print(nilaiTerfilterSensor1);
+  Serial.print(nilaiTerfilterLDR1);
 
   nilaiSensor2 = nilaiSensor2 / 5;
-  int nilaiTerfilterSensor2 = (int)lpf_get_filter(&filterLDR, nilaiSensor2);
+  int nilaiTerfilterLDR2 = (int)lpf_get_filter(&filterLDR2, nilaiSensor2);
   Serial.print("\tSensor2:");
   Serial.print(nilaiSensor2);
   Serial.print(",");
   Serial.print("\tFilter:");
-  Serial.print(nilaiTerfilterSensor2);
+  Serial.print(nilaiTerfilterLDR2);
 
   nilaiSensor3 = nilaiSensor3 / 5;
-  int nilaiTerfilterSensor3 = (int)lpf_get_filter(&filterLDR, nilaiSensor3);
+  int nilaiTerfilterLDR3 = (int)lpf_get_filter(&filterLDR3, nilaiSensor3);
   Serial.print("\tSensor3:");
   Serial.print(nilaiSensor3);
   Serial.print(",");
   Serial.print("\tFilter:");
-  Serial.print(nilaiTerfilterSensor3);
+  Serial.print(nilaiTerfilterLDR3);
   Serial.print("\n");
 
-  // TODO: GET GOLONGAN DARAH
-  GolonganDarah = "A+";
-  kodeGolonganDarah = 1;
+  if (nilaiTerfilterLDR1 < 350 && nilaiTerfilterLDR2 > 500 && nilaiTerfilterLDR3 > 100)
+  {
+
+    GolonganDarah = "A+";
+    kodeGolonganDarah = 1;
+  }
+  else if (nilaiTerfilterLDR1 < 350 && nilaiTerfilterLDR2 > 500 && nilaiTerfilterLDR3 < 100)
+  {
+    GolonganDarah = "A-";
+    kodeGolonganDarah = 2;
+  }
+  else if (nilaiTerfilterLDR1 > 500 && nilaiTerfilterLDR2 < 300 && nilaiTerfilterLDR3 > 300)
+  {
+    GolonganDarah = "B+";
+    kodeGolonganDarah = 3;
+  }
+  else if (nilaiTerfilterLDR1 > 500 && nilaiTerfilterLDR2 < 300 && nilaiTerfilterLDR3 < 300)
+  {
+    GolonganDarah = "B-";
+    kodeGolonganDarah = 4;
+  }
+  else if (nilaiTerfilterLDR1 > 350 && nilaiTerfilterLDR2 > 350 && nilaiTerfilterLDR3 > 100)
+  {
+    GolonganDarah = "AB+";
+    kodeGolonganDarah = 5;
+  }
+  else if (nilaiTerfilterLDR1 > 350 && nilaiTerfilterLDR2 > 350 && nilaiTerfilterLDR3 < 100)
+  {
+    GolonganDarah = "AB-";
+    kodeGolonganDarah = 6;
+  }
+  else if (nilaiTerfilterLDR1 < 350 && nilaiTerfilterLDR2 < 350 && nilaiTerfilterLDR3 > 300)
+  {
+    GolonganDarah = "O+";
+    kodeGolonganDarah = 7;
+  }
+  else if (nilaiTerfilterLDR1 < 350 && nilaiTerfilterLDR2 < 350 && nilaiTerfilterLDR3 < 300)
+  {
+    GolonganDarah = "O-";
+    kodeGolonganDarah = 2;
+  }
 
   Serial.print("Golongan Darah : ");
   Serial.println(GolonganDarah);
@@ -350,6 +423,35 @@ void process()
       Serial.print(ldrA4);
       Serial.print("\t");
       Serial.print(ldrA5);
+      Serial.println();
+
+      // Menampilkan nilai ldr Kelompok B
+      Serial.print("B: ");
+      Serial.print(ldrB1);
+      Serial.print("\t");
+      Serial.print(ldrB2);
+      Serial.print("\t");
+      Serial.print(ldrB3);
+      Serial.print("\t");
+      Serial.print(ldrB4);
+      Serial.print("\t");
+      Serial.print(ldrB5);
+      Serial.println();
+      // Serial.print("\t|| ");
+
+      // Menampilkan nilai ldr Kelompok C
+      Serial.print("C: ");
+      Serial.print(ldrC1);
+      Serial.print("\t");
+      Serial.print(ldrC2);
+      Serial.print("\t");
+      Serial.print(ldrC3);
+      Serial.print("\t");
+      Serial.print(ldrC4);
+      Serial.print("\t");
+      Serial.print(ldrC5);
+      Serial.println();
+
       Serial.println();
     }
 
@@ -511,6 +613,10 @@ void setup()
   init_blink();
   initServo();
   initPrinter();
+  initSound();
+  lpf_init(&filterLDR1, 1);
+  lpf_init(&filterLDR2, 1);
+  lpf_init(&filterLDR3, 1);
 
   // run once
   vavail();

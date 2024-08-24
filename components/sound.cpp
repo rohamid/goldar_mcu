@@ -6,13 +6,13 @@
 
 // Global variable and declaration
 //-----------------------------------------------------------------------------------------------
-// declare <component>
+// declare sound
 SoftwareSerial mySoftwareSerial(11, 10); // RX, TX
 
 // global variable Utama
 unsigned int timer = 0, timerinterval = 5000;
 
-// global variable <component>
+// global variable sound
 DFRobotDFPlayerMini myDFPlayer;
 
 // fungsi dari komponen
