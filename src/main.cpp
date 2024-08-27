@@ -9,6 +9,8 @@ start -> [init] -> open -> close -> run
 #include "Adafruit_Thermal.h"
 #include <DFRobotDFPlayerMini.h>
 
+#define MAX_READING_ITERATION 10
+
 // Global variable and declaration
 //-----------------------------------------------------------------------------------------------
 // declare indicatorLed
@@ -298,50 +300,76 @@ float lpf_get_filter(lpf_config_t *lpf, float input)
 void getGoldar()
 {
   int nilaiSensor1 = 0, nilaiSensor2 = 0, nilaiSensor3 = 0;
+  
+  /* Temporary variable for reading avg sensor */
+  int tempNilaiSensor1 = 0;
+  int tempNilaiSensor2 = 0;
+  int tempNilaiSensor3 = 0;
+  /* +++++++++++++++++++++++++++++++++++++++++ */
 
-  nilaiSensor1 += ldrA1;
-  nilaiSensor1 += ldrA2;
-  nilaiSensor1 += ldrA3;
-  nilaiSensor1 += ldrA4;
-  nilaiSensor1 += ldrA5;
+  
+  for (int i = 0; i < MAX_READING_ITERATION; i++) {
+    nilaiSensor1 += ldrA1;
+    nilaiSensor1 += ldrA2;
+    nilaiSensor1 += ldrA3;
+    nilaiSensor1 += ldrA4;
+    nilaiSensor1 += ldrA5;
 
-  nilaiSensor2 += ldrB1;
-  nilaiSensor2 += ldrB2;
-  nilaiSensor2 += ldrB3;
-  nilaiSensor2 += ldrB4;
-  nilaiSensor2 += ldrB5;
+    nilaiSensor2 += ldrB1;
+    nilaiSensor2 += ldrB2;
+    nilaiSensor2 += ldrB3;
+    nilaiSensor2 += ldrB4;
+    nilaiSensor2 += ldrB5;
 
-  nilaiSensor3 += ldrC1;
-  nilaiSensor3 += ldrC2;
-  nilaiSensor3 += ldrC3;
-  nilaiSensor3 += ldrC4;
-  nilaiSensor3 += ldrC5;
+    nilaiSensor3 += ldrC1;
+    nilaiSensor3 += ldrC2;
+    nilaiSensor3 += ldrC3;
+    nilaiSensor3 += ldrC4;
+    nilaiSensor3 += ldrC5;
+
+    nilaiSensor1 = nilaiSensor1 / 5;
+    nilaiSensor2 = nilaiSensor2 / 5;
+    nilaiSensor3 = nilaiSensor3 / 5;
+
+    tempNilaiSensor1 += nilaiSensor1;
+    tempNilaiSensor2 += nilaiSensor2;
+    tempNilaiSensor3 += nilaiSensor3;
+  }
+
+
 
   // Hitung rerata dari pembacaan 5 LDR
-  nilaiSensor1 = nilaiSensor1 / 5;
-  int nilaiTerfilterLDR1 = (int)lpf_get_filter(&filterLDR1, nilaiSensor1);
+  //nilaiSensor1 = nilaiSensor1 / 5;
+  //int nilaiTerfilterLDR1 = (int)lpf_get_filter(&filterLDR1, nilaiSensor1);
+  tempNilaiSensor1 = tempNilaiSensor1 / MAX_READING_ITERATION;
+  int nilaiTerfilterLDR1 = tempNilaiSensor1;
   Serial.print("Sensor1:");
   Serial.print(nilaiSensor1);
   Serial.print(",");
   Serial.print("\tFilter:");
   Serial.print(nilaiTerfilterLDR1);
 
-  nilaiSensor2 = nilaiSensor2 / 5;
-  int nilaiTerfilterLDR2 = (int)lpf_get_filter(&filterLDR2, nilaiSensor2);
+  //nilaiSensor2 = nilaiSensor2 / 5;
+  //int nilaiTerfilterLDR2 = (int)lpf_get_filter(&filterLDR2, nilaiSensor2);
+  tempNilaiSensor2 = tempNilaiSensor2 / MAX_READING_ITERATION;
+  int nilaiTerfilterLDR2 = tempNilaiSensor2;
   Serial.print("\tSensor2:");
   Serial.print(nilaiSensor2);
   Serial.print(",");
   Serial.print("\tFilter:");
   Serial.print(nilaiTerfilterLDR2);
 
-  nilaiSensor3 = nilaiSensor3 / 5;
-  int nilaiTerfilterLDR3 = (int)lpf_get_filter(&filterLDR3, nilaiSensor3);
+  //nilaiSensor3 = nilaiSensor3 / 5;
+  //int nilaiTerfilterLDR3 = (int)lpf_get_filter(&filterLDR3, nilaiSensor3);
+  tempNilaiSensor3 = tempNilaiSensor3 / MAX_READING_ITERATION;
+  int nilaiTerfilterLDR3 = tempNilaiSensor3;
   Serial.print("\tSensor3:");
   Serial.print(nilaiSensor3);
   Serial.print(",");
   Serial.print("\tFilter:");
   Serial.print(nilaiTerfilterLDR3);
   Serial.print("\n");
+
 
   if (nilaiTerfilterLDR1 < 350 && nilaiTerfilterLDR2 > 500 && nilaiTerfilterLDR3 > 100)
   {
